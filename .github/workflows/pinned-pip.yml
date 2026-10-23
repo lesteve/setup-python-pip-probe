@@ -9,6 +9,10 @@ permissions:
 
 jobs:
   verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        certificates: [default, legacy-certs]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v7.1.0
@@ -21,15 +25,28 @@ jobs:
           python -m pip --version
           python -c 'import pip; assert pip.__version__ == "26.2.2", pip.__version__'
       - name: Verify pip rejects compromised certificate chains
+        continue-on-error: ${{ matrix.certificates == 'default' }}
         shell: bash
+        env:
+          CERTIFICATES: ${{ matrix.certificates }}
         run: |
+          options=()
+          if [ "$CERTIFICATES" = legacy-certs ]; then
+            options+=(--use-deprecated=legacy-certs)
+          fi
+          failed=0
           for host in dv-g3b-noct-emudhra.we-have-a-problem.com dv-g3b-aaa-noct-emudhra.we-have-a-problem.com; do
-            if python -m pip index versions pip --index-url "https://$host/" --retries 0 --timeout 20 > probe.log 2>&1; then
+            if python -m pip index versions pip "${options[@]}" --index-url "https://$host/" --retries 0 --timeout 20 > probe.log 2>&1; then
               cat probe.log
               echo "Unexpected success for $host"
               exit 1
             fi
             cat probe.log
-            grep -q 'CERTIFICATE_VERIFY_FAILED' probe.log
-            echo "Confirmed certificate rejection for $host"
+            if grep -q 'CERTIFICATE_VERIFY_FAILED' probe.log; then
+              echo "Confirmed certificate rejection for $host"
+            else
+              echo "Certificate rejection NOT confirmed for $host"
+              failed=1
+            fi
           done
+          exit "$failed"
