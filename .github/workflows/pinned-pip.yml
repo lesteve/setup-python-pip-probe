@@ -1,0 +1,35 @@
+name: Verify pinned pip on Ubuntu
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+          pip-version: '26.2.2'
+      - name: Verify pip version
+        run: |
+          python --version
+          python -m pip --version
+          python -c 'import pip; assert pip.__version__ == "26.2.2", pip.__version__'
+      - name: Verify pip rejects compromised certificate chains
+        shell: bash
+        run: |
+          for host in dv-g3b-noct-emudhra.we-have-a-problem.com dv-g3b-aaa-noct-emudhra.we-have-a-problem.com; do
+            if python -m pip index versions pip --index-url "https://$host/" --retries 0 --timeout 20 > probe.log 2>&1; then
+              cat probe.log
+              echo "Unexpected success for $host"
+              exit 1
+            fi
+            cat probe.log
+            grep -q 'CERTIFICATE_VERIFY_FAILED' probe.log
+            echo "Confirmed certificate rejection for $host"
+          done
