@@ -13,8 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         certificates: [default, legacy-certs]
-    runs-on: ubuntu-latest
+        os: [ubuntu-latest, ubuntu-26.04]
+    runs-on: ${{ matrix.os }}
     steps:
+      - name: Print system certificate package version
+        run: dpkg-query -W ca-certificates
       - uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.12'
