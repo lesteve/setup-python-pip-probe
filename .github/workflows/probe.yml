@@ -1,0 +1,38 @@
+name: Check Python 3.12 pip
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Print installed and bundled pip versions
+        shell: bash
+        run: |
+          python --version
+          python -m pip --version
+          python -c 'import ensurepip; print("ensurepip bundled pip:", ensurepip.version())'
+          python - <<'PY'
+          import ensurepip
+          import os
+          import platform
+          import sys
+          import pip
+
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write(f"| OS | Python | Installed pip | Bundled pip |\n")
+              summary.write("| --- | --- | --- | --- |\n")
+              summary.write(f"| {platform.system()} | {sys.version.split()[0]} | {pip.__version__} | {ensurepip.version()} |\n")
+          PY
